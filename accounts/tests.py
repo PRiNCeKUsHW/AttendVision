@@ -48,6 +48,22 @@ class TeacherAuthTests(TestCase):
         )
         self.assertContains(resp, "do not match")
 
+    def test_login_next_rejects_offsite_redirects(self):
+        make_teacher()
+        for evil in ("https://evil.example/", "//evil.example", "/\\evil.example", "///evil.example"):
+            resp = self.client.post(
+                reverse("accounts:teacher_login") + "?next=" + evil,
+                {"username": "ananya", "password": "secret123"},
+            )
+            self.assertEqual(resp.status_code, 302)
+            self.assertEqual(resp.url, reverse("classroom:teacher_dashboard"), evil)
+            self.client.logout()
+        resp = self.client.post(
+            reverse("accounts:teacher_login") + "?next=/join/CS101/",
+            {"username": "ananya", "password": "secret123"},
+        )
+        self.assertEqual(resp.url, "/join/CS101/")
+
     def test_bad_login_shows_error(self):
         make_teacher()
         resp = self.client.post(reverse("accounts:teacher_login"), {"username": "ananya", "password": "wrong"})

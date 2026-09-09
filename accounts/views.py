@@ -3,6 +3,7 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods, require_POST
 
 from ml.face import get_face_embeddings, image_bytes_to_array, invalidate_face_model, recognise_faces
@@ -13,8 +14,11 @@ from .models import Student, Teacher
 
 
 def _safe_next(request, fallback):
+    """Return the requested `next` URL only if it stays on this host."""
     nxt = request.GET.get("next") or request.POST.get("next")
-    if nxt and nxt.startswith("/") and not nxt.startswith("//"):
+    if nxt and url_has_allowed_host_and_scheme(
+        nxt, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
         return nxt
     return fallback
 
