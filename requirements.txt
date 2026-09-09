@@ -1,23 +1,22 @@
-# Utilities 
+# Web framework
+django>=5.1,<6
+dj-database-url
 
+# Utilities
 numpy
-pandas 
+pillow
+segno
 
-
-# face recognition
+# Face recognition
 scikit-learn
-dlib-bin 
+dlib-bin
 git+https://github.com/ageitgey/face_recognition_models
 setuptools<70.0.0
 
-supabase
-bcrypt
-
-
-segno
-pillow
-
-
-streamlit
-
+# Voice recognition
 resemblyzer
+librosa
+soundfile
+
+# Optional: PostgreSQL / Supabase via DATABASE_URL
+# psycopg[binary]

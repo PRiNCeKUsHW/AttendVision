@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Teacher registration · AttendVision{% endblock %}
+
+{% block content %}
+{% include "partials/icons.html" %}
+<header class="topbar">
+  {% include "partials/brand.html" %}
+  <a class="btn btn-pink" href="{% url 'accounts:home' %}">Back to home</a>
+</header>
+
+<div class="auth">
+  <div>
+    <h1 class="display">Create your teacher profile</h1>
+    <p class="muted">Pick a username you'll remember. You'll use it to log in.</p>
+  </div>
+
+  <form class="card" method="post" x-data="{ pw: '', pw2: '' }">
+    {% csrf_token %}
+    {% if error %}<div class="alert alert-error" role="alert">{{ error }}</div>{% endif %}
+    <div class="field">
+      <label for="username">Username</label>
+      <input class="input" id="username" name="username" value="{{ form.username }}" placeholder="ananyaroy" autocomplete="username" autofocus required>
+    </div>
+    <div class="field">
+      <label for="name">Full name</label>
+      <input class="input" id="name" name="name" value="{{ form.name }}" placeholder="Ananya Roy" autocomplete="name" required>
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input class="input" id="password" name="password" type="password" placeholder="At least 6 characters" autocomplete="new-password" minlength="6" x-model="pw" required>
+    </div>
+    <div class="field">
+      <label for="password_confirm">Confirm password</label>
+      <input class="input" id="password_confirm" name="password_confirm" type="password" placeholder="Type it again" autocomplete="new-password" x-model="pw2" required>
+      <p class="small" x-cloak x-show="pw2 && pw !== pw2" style="color: var(--coral)">Passwords don't match yet.</p>
+    </div>
+    <button class="btn btn-lg btn-block" type="submit" :disabled="pw.length < 6 || pw !== pw2">Create profile</button>
+    <p class="auth-switch">Already registered? <a href="{% url 'accounts:teacher_login' %}">Log in instead</a></p>
+  </form>
+</div>
+{% endblock %}

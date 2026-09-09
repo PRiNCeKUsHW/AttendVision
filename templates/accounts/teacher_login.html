@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Teacher login · AttendVision{% endblock %}
+
+{% block content %}
+{% include "partials/icons.html" %}
+<header class="topbar">
+  {% include "partials/brand.html" %}
+  <a class="btn btn-pink" href="{% url 'accounts:home' %}">Back to home</a>
+</header>
+
+<div class="auth">
+  <div>
+    <h1 class="display">Log in with your password</h1>
+    <p class="muted">Teacher accounts use a username and password.</p>
+  </div>
+
+  <form class="card" method="post" action="{% url 'accounts:teacher_login' %}{% if next %}?next={{ next|urlencode }}{% endif %}">
+    {% csrf_token %}
+    {% if error %}<div class="alert alert-error" role="alert">{{ error }}</div>{% endif %}
+    <div class="field">
+      <label for="username">Username</label>
+      <input class="input" id="username" name="username" value="{{ username }}" placeholder="ananyaroy" autocomplete="username" autofocus required>
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input class="input" id="password" name="password" type="password" placeholder="Your password" autocomplete="current-password" required>
+    </div>
+    <button class="btn btn-lg btn-block" type="submit">Log in</button>
+    <p class="auth-switch">New here? <a href="{% url 'accounts:teacher_register' %}">Create a teacher profile</a></p>
+  </form>
+</div>
+{% endblock %}

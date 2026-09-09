@@ -1,0 +1,50 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>{% block title %}AttendVision{% endblock %}</title>
+  <link rel="icon" type="image/png" href="{% static 'img/favicon.png' %}">
+  <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;900&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <script src="{% static 'js/app.js' %}"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.14.8/cdn.min.js" integrity="sha384-X9kJyAubVxnP0hcA+AMMs21U445qsnqhnUF8EBlEpP3a42Kh/JwWjlv2ZcvGfphb" crossorigin="anonymous"></script>
+  {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <div class="scene" aria-hidden="true"><span class="orb"></span></div>
+  {% block body %}
+  <main class="shell">
+    {% block content %}{% endblock %}
+  </main>
+  {% endblock %}
+
+  <footer class="footer">
+    <span>Created with ❤️ by</span>
+    <strong>Anuj</strong>
+  </footer>
+
+  <div class="toasts" x-data aria-live="polite">
+    <template x-for="toast in $store.toasts.items" :key="toast.id">
+      <div class="toast fade-enter" :class="'toast-' + toast.type" role="status">
+        <span x-text="toast.message"></span>
+      </div>
+    </template>
+  </div>
+
+  {% if messages %}
+  <script>
+    document.addEventListener("alpine:initialized", function () {
+      {% for message in messages %}
+      Snap.toast("{{ message.message|escapejs }}", "{{ message.tags|default:'info' }}");
+      {% endfor %}
+    });
+  </script>
+  {% endif %}
+  {% block scripts %}{% endblock %}
+</body>
+</html>

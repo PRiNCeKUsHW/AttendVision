@@ -1,0 +1,559 @@
+{% extends "base.html" %}
+{% block title %}Teacher dashboard · AttendVision{% endblock %}
+
+{% block content %}
+{% include "partials/icons.html" %}
+{{ subjects_json|json_script:"subjects-data" }}
+
+<header class="topbar">
+  {% include "partials/brand.html" %}
+  <div class="topbar-right">
+    <span class="welcome">Welcome, {{ teacher.name }}</span>
+    <form method="post" action="{% url 'accounts:teacher_logout' %}">
+      {% csrf_token %}
+      <button class="btn btn-pink btn-sm" type="submit"><svg><use href="#i-logout"/></svg> Log out</button>
+    </form>
+  </div>
+</header>
+
+<div x-data="teacherDashboard()" x-init="init()">
+  <nav class="tabs" role="tablist" aria-label="Dashboard sections">
+    <button class="tab" role="tab" :class="{ 'is-active': tab === 'attendance' }" :aria-selected="tab === 'attendance'" @click="setTab('attendance')">
+      <svg><use href="#i-scan"/></svg> Take attendance
+    </button>
+    <button class="tab" role="tab" :class="{ 'is-active': tab === 'subjects' }" :aria-selected="tab === 'subjects'" @click="setTab('subjects')">
+      <svg><use href="#i-book"/></svg> Manage subjects
+    </button>
+    <button class="tab" role="tab" :class="{ 'is-active': tab === 'records' }" :aria-selected="tab === 'records'" @click="setTab('records')">
+      <svg><use href="#i-list"/></svg> Attendance records
+    </button>
+  </nav>
+  <hr class="rule">
+
+  {# ------------------------------------------------------ Take attendance #}
+  <section x-cloak x-show="tab === 'attendance'" class="fade-enter" role="tabpanel">
+    <div class="section-head">
+      <div>
+        <h2 class="display">Take AI attendance</h2>
+        <p class="muted">Add classroom photos, then AttendVision marks who's in the room.</p>
+      </div>
+    </div>
+
+    {% if subjects %}
+    <div class="stack">
+      <div class="attendance-toolbar">
+        <div class="field">
+          <label for="subject-select">Subject</label>
+          <select class="input" id="subject-select" x-model="subjectId">
+            <template x-for="s in subjects" :key="s.id">
+              <option :value="String(s.id)" x-text="`${s.name} — ${s.code} (Section ${s.section})`"></option>
+            </template>
+          </select>
+        </div>
+        <button class="btn" type="button" @click="photosOpen = true">
+          <svg><use href="#i-camera"/></svg> Add photos
+        </button>
+      </div>
+
+      <div class="empty" x-show="!photos.length" :class="{ 'is-dragover': dragging }"
+           @dragover.prevent="dragging = true" @dragleave.prevent="dragging = false"
+           @drop.prevent="dragging = false; addFiles($event.dataTransfer.files)">
+        <svg width="44" height="44"><use href="#i-camera"/></svg>
+        <h3>No classroom photos yet</h3>
+        <p class="muted">Drop photos here, or add them from your camera or files.</p>
+        <button class="btn btn-light" type="button" @click="photosOpen = true">Add photos</button>
+      </div>
+
+      <div class="stack" x-cloak x-show="photos.length">
+        <h3 x-text="`${photos.length} ${photos.length === 1 ? 'photo' : 'photos'} ready to scan`"></h3>
+        <div class="gallery">
+          <template x-for="(p, i) in photos" :key="p.id">
+            <figure class="photo" style="margin:0">
+              <img :src="p.url" :alt="`Photo ${i + 1}`">
+              <span class="photo-label" x-text="`Photo ${i + 1}`"></span>
+              <button class="icon-btn" type="button" title="Remove photo" @click="removePhoto(p.id)"><svg><use href="#i-close"/></svg></button>
+            </figure>
+          </template>
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button class="btn btn-dark" type="button" :disabled="!photos.length || analysing" @click="clearPhotos()">
+          <svg><use href="#i-trash"/></svg> Clear all photos
+        </button>
+        <button class="btn btn-pink" type="button" :disabled="!photos.length || analysing" @click="analyseFaces()">
+          <span class="spinner" x-cloak x-show="analysing"></span>
+          <svg x-show="!analysing"><use href="#i-scan"/></svg>
+          <span x-text="analysing ? 'Scanning photos…' : 'Run face analysis'"></span>
+        </button>
+        <button class="btn" type="button" :disabled="analysing" @click="voiceOpen = true">
+          <svg><use href="#i-mic"/></svg> Use voice attendance
+        </button>
+      </div>
+    </div>
+    {% else %}
+    <div class="empty">
+      <h3>You haven't created any subjects yet</h3>
+      <p class="muted">Create one to start taking attendance.</p>
+      <button class="btn" type="button" @click="setTab('subjects'); createOpen = true"><svg><use href="#i-plus"/></svg> Create a subject</button>
+    </div>
+    {% endif %}
+  </section>
+
+  {# ------------------------------------------------------- Manage subjects #}
+  <section x-cloak x-show="tab === 'subjects'" class="fade-enter" role="tabpanel">
+    <div class="section-head">
+      <div>
+        <h2 class="display">Manage subjects</h2>
+        <p class="muted">Share a subject's code so students can enroll themselves.</p>
+      </div>
+      <button class="btn" type="button" @click="createOpen = true"><svg><use href="#i-plus"/></svg> Create new subject</button>
+    </div>
+
+    {% if subjects %}
+    <div class="grid-2">
+      {% for s in subjects %}
+      <article class="card subject-card">
+        <div>
+          <h3 class="card-title">{{ s.name }}</h3>
+          <div class="subject-meta">
+            <span class="code-chip">{{ s.subject_code }}</span>
+            <span>Section {{ s.section }}</span>
+          </div>
+        </div>
+        <div class="stat-row">
+          <span class="stat-pill"><strong>{{ s.total_students }}</strong> student{{ s.total_students|pluralize }}</span>
+          <span class="stat-pill"><strong>{{ s.total_classes }}</strong> class{{ s.total_classes|pluralize:"es" }}</span>
+        </div>
+        <div class="subject-actions">
+          <button class="btn btn-sm" type="button" @click="openShare({{ s.pk }})"><svg><use href="#i-share"/></svg> Share join code</button>
+          <button class="btn btn-sm btn-light" type="button" @click="subjectId = '{{ s.pk }}'; setTab('attendance')">Take attendance</button>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">
+      <h3>No subjects found</h3>
+      <p class="muted">Create your first subject to get a join code for students.</p>
+      <button class="btn" type="button" @click="createOpen = true"><svg><use href="#i-plus"/></svg> Create new subject</button>
+    </div>
+    {% endif %}
+  </section>
+
+  {# ---------------------------------------------------- Attendance records #}
+  <section x-cloak x-show="tab === 'records'" class="fade-enter" role="tabpanel" x-data="{ filter: '', open: null }">
+    <div class="section-head">
+      <div>
+        <h2 class="display">Attendance records</h2>
+        <p class="muted">One row per class session. Select a row to see every student.</p>
+      </div>
+      {% if sessions %}
+      <div class="field">
+        <label for="records-filter" class="visually-hidden">Filter by subject</label>
+        <select class="input" id="records-filter" x-model="filter">
+          <option value="">All subjects</option>
+          {% for s in subjects %}<option value="{{ s.pk }}">{{ s.name }} — {{ s.subject_code }}</option>{% endfor %}
+        </select>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if sessions %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>When</th><th>Subject</th><th>Code</th><th>Present</th><th>Method</th><th><span class="visually-hidden">Details</span></th></tr>
+        </thead>
+        <tbody>
+          {% for s in sessions %}
+          <tr class="session-row" tabindex="0"
+              x-show="!filter || filter === '{{ s.subject.pk }}'"
+              :aria-expanded="open === {{ forloop.counter }}"
+              @click="open = open === {{ forloop.counter }} ? null : {{ forloop.counter }}"
+              @keydown.enter.prevent="open = open === {{ forloop.counter }} ? null : {{ forloop.counter }}"
+              @keydown.space.prevent="open = open === {{ forloop.counter }} ? null : {{ forloop.counter }}">
+            <td>{{ s.session_at|date:"D, j M Y" }}<br><span class="muted small">{{ s.session_at|date:"g:i A" }}</span></td>
+            <td>{{ s.subject.name }}</td>
+            <td><span class="code-chip">{{ s.subject.subject_code }}</span></td>
+            <td><span class="badge {% if s.present == s.total %}badge-present{% elif s.present == 0 %}badge-absent{% endif %}">{{ s.present }} / {{ s.total }}</span></td>
+            <td><span class="badge badge-source">{{ s.source|title }}</span></td>
+            <td><svg width="18" height="18" :style="open === {{ forloop.counter }} ? 'transform: rotate(180deg)' : ''"><use href="#i-chevron"/></svg></td>
+          </tr>
+          <tr class="session-detail" x-cloak x-show="open === {{ forloop.counter }} && (!filter || filter === '{{ s.subject.pk }}')">
+            <td colspan="6">
+              <div class="chip-list">
+                {% for st in s.students %}
+                <span class="badge {% if st.is_present %}badge-present{% else %}badge-absent{% endif %}">{{ st.name }}</span>
+                {% endfor %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty">
+      <h3>No attendance taken yet</h3>
+      <p class="muted">Sessions you save from the Take attendance tab will show up here.</p>
+    </div>
+    {% endif %}
+  </section>
+
+  {# ---------------------------------------------------------- Photos modal #}
+  <div class="modal-backdrop" x-cloak x-show="photosOpen" @keydown.escape.window="photosOpen = false" @click.self="photosOpen = false">
+    <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="photos-title"
+         x-data="camera({ facing: 'environment' })" x-effect="photosOpen && photoTab === 'camera' ? start() : stop()">
+      <div class="modal-head">
+        <div>
+          <h2 id="photos-title">Add classroom photos</h2>
+          <p class="muted small">Snap the room a few times from different angles for the best results.</p>
+        </div>
+        <button class="icon-btn" type="button" aria-label="Close" @click="photosOpen = false"><svg><use href="#i-close"/></svg></button>
+      </div>
+
+      <div class="segmented" role="tablist">
+        <button type="button" :class="{ 'is-active': photoTab === 'camera' }" @click="photoTab = 'camera'">Camera</button>
+        <button type="button" :class="{ 'is-active': photoTab === 'upload' }" @click="photoTab = 'upload'">Upload files</button>
+      </div>
+
+      <div x-show="photoTab === 'camera'" class="stack">
+        <div class="cam no-mirror">
+          <video x-ref="video" playsinline muted autoplay></video>
+          <div class="cam-overlay" x-cloak x-show="error">
+            <p x-text="error"></p>
+            <button class="btn btn-light" type="button" @click="start()">Try again</button>
+          </div>
+        </div>
+        <div class="cluster">
+          <button class="btn btn-pink" type="button" :disabled="!ready" @click="capture().then(b => b && addBlob(b, 'snapshot.jpg', true))">
+            <svg><use href="#i-camera"/></svg> Take snapshot
+          </button>
+          <button class="icon-btn" type="button" title="Switch camera" @click="flip()"><svg><use href="#i-flip"/></svg></button>
+          <span class="muted small" x-text="photos.length ? `${photos.length} added so far` : ''"></span>
+        </div>
+      </div>
+
+      <div x-cloak x-show="photoTab === 'upload'" class="stack">
+        <label class="empty" style="cursor:pointer" :class="{ 'is-dragover': dragging }"
+               @dragover.prevent="dragging = true" @dragleave.prevent="dragging = false"
+               @drop.prevent="dragging = false; addFiles($event.dataTransfer.files)">
+          <svg width="40" height="40"><use href="#i-upload"/></svg>
+          <h3>Choose image files</h3>
+          <p class="muted small">JPG or PNG. You can pick several at once.</p>
+          <input type="file" class="visually-hidden" accept="image/*" multiple @change="addFiles($event.target.files); $event.target.value = ''">
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn" type="button" @click="photosOpen = false"><svg><use href="#i-check"/></svg> Done</button>
+      </div>
+    </div>
+  </div>
+
+  {# ----------------------------------------------------------- Voice modal #}
+  <div class="modal-backdrop" x-cloak x-show="voiceOpen" @keydown.escape.window="voiceOpen = false" @click.self="voiceOpen = false">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="voice-title" x-data="recorder({ maxSeconds: 180 })" x-effect="if (!voiceOpen) reset()">
+      <div class="modal-head">
+        <div>
+          <h2 id="voice-title">Voice attendance</h2>
+          <p class="muted small">Record students saying “I am present”. AttendVision matches each voice to a profile.</p>
+        </div>
+        <button class="icon-btn" type="button" aria-label="Close" @click="voiceOpen = false"><svg><use href="#i-close"/></svg></button>
+      </div>
+
+      <div class="alert alert-info small" x-show="subject">Marking attendance for <strong x-text="subject ? subject.name : ''"></strong>.</div>
+
+      <div class="recorder">
+        <div class="recorder-row">
+          <button class="btn btn-dark" type="button" x-show="!recording" :disabled="processing" @click="start()">
+            <svg><use href="#i-mic"/></svg> <span x-text="blob ? 'Record again' : 'Start recording'"></span>
+          </button>
+          <button class="btn btn-pink" type="button" x-cloak x-show="recording" @click="stop()">
+            <span class="rec-dot"></span> Stop · <span x-text="label"></span>
+          </button>
+          <span class="muted small" x-cloak x-show="processing"><span class="spinner"></span> Processing…</span>
+          <span class="badge badge-present" x-cloak x-show="blob && !processing"><svg width="14" height="14"><use href="#i-check"/></svg> Recording ready</span>
+        </div>
+        <audio controls x-cloak x-show="url" :src="url"></audio>
+        <p class="small" x-cloak x-show="error" x-text="error" style="color: var(--coral)"></p>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-light" type="button" @click="voiceOpen = false">Cancel</button>
+        <button class="btn" type="button" :disabled="!blob || processing || analysing" @click="analyseVoice(blob)">
+          <span class="spinner" x-cloak x-show="analysing"></span>
+          <span x-text="analysing ? 'Listening…' : 'Analyse audio'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  {# ---------------------------------------------------------- Review modal #}
+  <div class="modal-backdrop" x-cloak x-show="review" @keydown.escape.window="review = null">
+    <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="review-title" x-show="review">
+      <div class="modal-head">
+        <div>
+          <h2 id="review-title">Review attendance</h2>
+          <p class="muted small">
+            <span x-text="review && review.subject"></span> · <span x-text="review && new Date(review.session_at).toLocaleString()"></span>
+          </p>
+        </div>
+        <span class="badge badge-present"><strong x-text="reviewPresent"></strong>&nbsp;/ <span x-text="review && review.total"></span> present</span>
+      </div>
+
+      <p class="small muted">Select a status to correct it before saving.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th x-text="review && review.source === 'voice' ? 'Voice match' : 'Seen in'"></th><th>Status</th></tr></thead>
+          <tbody>
+            <template x-for="row in (review ? review.rows : [])" :key="row.student_id">
+              <tr>
+                <td x-text="row.name"></td>
+                <td class="muted" x-text="row.source"></td>
+                <td>
+                  <button type="button" class="badge badge-toggle" :class="row.is_present ? 'badge-present' : 'badge-absent'"
+                          @click="toggleRow(row)" :aria-pressed="row.is_present">
+                    <span x-text="row.is_present ? 'Present' : 'Absent'"></span>
+                  </button>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-light" type="button" :disabled="saving" @click="discardReview()">Discard</button>
+        <button class="btn btn-mint" type="button" :disabled="saving" @click="confirmReview()">
+          <span class="spinner" x-cloak x-show="saving"></span>
+          <svg x-show="!saving"><use href="#i-check"/></svg>
+          <span x-text="saving ? 'Saving…' : 'Confirm and save'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  {# -------------------------------------------------- Create subject modal #}
+  <div class="modal-backdrop" x-cloak x-show="createOpen" @keydown.escape.window="createOpen = false" @click.self="createOpen = false">
+    <form class="modal" role="dialog" aria-modal="true" aria-labelledby="create-title" @submit.prevent="createSubject()">
+      <div class="modal-head">
+        <div>
+          <h2 id="create-title">Create new subject</h2>
+          <p class="muted small">Students will use the code to enroll.</p>
+        </div>
+        <button class="icon-btn" type="button" aria-label="Close" @click="createOpen = false"><svg><use href="#i-close"/></svg></button>
+      </div>
+      <div class="field">
+        <label for="new-code">Subject code</label>
+        <input class="input" id="new-code" x-model="createForm.subject_code" placeholder="CS101" required autocomplete="off" style="text-transform: uppercase">
+      </div>
+      <div class="field">
+        <label for="new-name">Subject name</label>
+        <input class="input" id="new-name" x-model="createForm.name" placeholder="Introduction to Computer Science" required>
+      </div>
+      <div class="field">
+        <label for="new-section">Section</label>
+        <input class="input" id="new-section" x-model="createForm.section" placeholder="A" required>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-light" type="button" @click="createOpen = false">Cancel</button>
+        <button class="btn" type="submit" :disabled="creating">
+          <span class="spinner" x-cloak x-show="creating"></span>
+          <span x-text="creating ? 'Creating…' : 'Create subject'"></span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  {# ----------------------------------------------------------- Share modal #}
+  <div class="modal-backdrop" x-cloak x-show="share" @keydown.escape.window="share = null" @click.self="share = null">
+    <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="share-title" x-show="share">
+      <div class="modal-head">
+        <div>
+          <h2 id="share-title">Share <span x-text="share && share.name"></span></h2>
+          <p class="muted small">Students scan the QR code or open the link and confirm to enroll.</p>
+        </div>
+        <button class="icon-btn" type="button" aria-label="Close" @click="share = null"><svg><use href="#i-close"/></svg></button>
+      </div>
+      <div class="share-grid">
+        <div class="stack">
+          <div class="field">
+            <label>Subject code</label>
+            <div class="cluster">
+              <span class="big-code" x-text="share && share.code"></span>
+              <button class="btn btn-sm btn-light" type="button" @click="copy(share.code)"><svg><use href="#i-copy"/></svg> Copy code</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="share-link">Join link</label>
+            <div class="copy-box">
+              <input class="input" id="share-link" readonly :value="share && share.join_url" @focus="$event.target.select()">
+              <button class="btn btn-sm" type="button" @click="copy(share.join_url)"><svg><use href="#i-copy"/></svg> Copy</button>
+            </div>
+            <p class="muted small">Paste it in WhatsApp, email or your class group.</p>
+          </div>
+        </div>
+        <img :src="share && share.qr" alt="QR code for the join link">
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener("alpine:init", () => {
+    const URLS = {
+      faces: "{% url 'classroom:api_analyse_faces' %}",
+      voice: "{% url 'classroom:api_analyse_voice' %}",
+      save: "{% url 'classroom:api_save_attendance' %}",
+      create: "{% url 'classroom:api_create_subject' %}",
+    };
+    const TABS = ["attendance", "subjects", "records"];
+
+    Alpine.data("teacherDashboard", () => ({
+      subjects: JSON.parse(document.getElementById("subjects-data").textContent),
+      tab: "attendance",
+      subjectId: "",
+      photos: [],
+      dragging: false,
+      analysing: false,
+      photosOpen: false,
+      photoTab: "camera",
+      voiceOpen: false,
+      review: null,
+      saving: false,
+      createOpen: false,
+      creating: false,
+      createForm: { subject_code: "", name: "", section: "" },
+      share: null,
+
+      init() {
+        const hash = window.location.hash.replace("#", "");
+        if (TABS.includes(hash)) this.tab = hash;
+        if (this.subjects.length) this.subjectId = String(this.subjects[0].id);
+      },
+
+      get subject() {
+        return this.subjects.find((s) => String(s.id) === String(this.subjectId)) || null;
+      },
+
+      setTab(tab) {
+        this.tab = tab;
+        history.replaceState(null, "", "#" + tab);
+      },
+
+      addBlob(blob, name, announce = false) {
+        const id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now() + Math.random());
+        this.photos.push({ id, blob, name, url: URL.createObjectURL(blob) });
+        if (announce) Snap.toast("Photo captured", "success", 1500);
+      },
+
+      addFiles(fileList) {
+        const files = Array.from(fileList || []).filter((f) => f.type.startsWith("image/"));
+        files.forEach((f) => this.addBlob(f, f.name));
+        if (files.length) Snap.toast(`${files.length} ${files.length === 1 ? "photo" : "photos"} added`, "success", 2000);
+        else Snap.toast("Only image files can be added.", "error");
+      },
+
+      removePhoto(id) {
+        const photo = this.photos.find((p) => p.id === id);
+        if (photo) URL.revokeObjectURL(photo.url);
+        this.photos = this.photos.filter((p) => p.id !== id);
+      },
+
+      clearPhotos() {
+        this.photos.forEach((p) => URL.revokeObjectURL(p.url));
+        this.photos = [];
+      },
+
+      async analyseFaces() {
+        if (!this.subjectId) return Snap.toast("Pick a subject first.", "error");
+        this.analysing = true;
+        const form = new FormData();
+        form.append("subject_id", this.subjectId);
+        this.photos.forEach((p, i) => form.append("photos", p.blob, p.name || `photo-${i + 1}.jpg`));
+        try {
+          const data = await Snap.api(URLS.faces, { form });
+          this.review = data.review;
+        } catch (err) {
+          Snap.toast(err.message, "error");
+        } finally {
+          this.analysing = false;
+        }
+      },
+
+      async analyseVoice(blob) {
+        if (!this.subjectId) return Snap.toast("Pick a subject first.", "error");
+        this.analysing = true;
+        const form = new FormData();
+        form.append("subject_id", this.subjectId);
+        form.append("audio", blob, "classroom.wav");
+        try {
+          const data = await Snap.api(URLS.voice, { form });
+          this.voiceOpen = false;
+          this.review = data.review;
+        } catch (err) {
+          Snap.toast(err.message, "error");
+        } finally {
+          this.analysing = false;
+        }
+      },
+
+      get reviewPresent() {
+        return this.review ? this.review.rows.filter((r) => r.is_present).length : 0;
+      },
+
+      toggleRow(row) {
+        row.is_present = !row.is_present;
+        row.source = "manual";
+      },
+
+      discardReview() {
+        if (this.review && this.review.source === "face") this.clearPhotos();
+        this.review = null;
+      },
+
+      async confirmReview() {
+        if (!this.review) return;
+        this.saving = true;
+        const { subject_id, session_at, rows, source } = this.review;
+        try {
+          await Snap.api(URLS.save, { json: { subject_id, session_at, rows, source } });
+          Snap.reload(`Attendance saved: ${this.reviewPresent} of ${rows.length} present.`);
+        } catch (err) {
+          Snap.toast(err.message, "error");
+          this.saving = false;
+        }
+      },
+
+      async createSubject() {
+        this.creating = true;
+        try {
+          const data = await Snap.api(URLS.create, { json: this.createForm });
+          Snap.reload(`Subject ${data.subject.code} created.`);
+        } catch (err) {
+          Snap.toast(err.message, "error");
+          this.creating = false;
+        }
+      },
+
+      openShare(id) {
+        this.share = this.subjects.find((s) => s.id === id) || null;
+      },
+
+      async copy(text) {
+        try {
+          await navigator.clipboard.writeText(text);
+          Snap.toast("Copied to clipboard", "success", 2000);
+        } catch (err) {
+          Snap.toast("Copy failed. Select the text and copy it manually.", "error");
+        }
+      },
+    }));
+  });
+</script>
+{% endblock %}

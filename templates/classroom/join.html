@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Join subject · AttendVision{% endblock %}
+
+{% block content %}
+{% include "partials/icons.html" %}
+<header class="topbar">
+  {% include "partials/brand.html" %}
+  <a class="btn btn-pink" href="{% url 'classroom:student_dashboard' %}">My dashboard</a>
+</header>
+
+<div class="auth">
+  {% if subject %}
+    <div>
+      <h1 class="display">Join {{ subject.name }}?</h1>
+      <p class="muted">Hi {{ student.name }}. Your teacher shared this subject with you.</p>
+    </div>
+    <div class="card card-blurple stack">
+      <div class="subject-meta">
+        <span class="code-chip">{{ subject.subject_code }}</span>
+        <span>Section {{ subject.section }}</span>
+        <span>Taught by {{ subject.teacher.name }}</span>
+      </div>
+      {% if already %}
+        <div class="alert alert-info">You're already enrolled in this subject.</div>
+        <a class="btn btn-block" href="{% url 'classroom:student_dashboard' %}">Go to my subjects</a>
+      {% else %}
+        <form method="post" class="cluster">
+          {% csrf_token %}
+          <button class="btn btn-lg" type="submit">Yes, enroll me</button>
+          <a class="btn btn-light" href="{% url 'classroom:student_dashboard' %}">No thanks</a>
+        </form>
+      {% endif %}
+    </div>
+  {% else %}
+    <div>
+      <h1 class="display">We could not find that subject</h1>
+      <p class="muted">The code <span class="code-chip">{{ code }}</span> doesn't match any subject. Ask your teacher to share the link again.</p>
+    </div>
+    <a class="btn" href="{% url 'classroom:student_dashboard' %}">Back to my subjects</a>
+  {% endif %}
+</div>
+{% endblock %}

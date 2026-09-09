@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}My subjects · AttendVision{% endblock %}
+
+{% block content %}
+{% include "partials/icons.html" %}
+<header class="topbar">
+  {% include "partials/brand.html" %}
+  <div class="topbar-right">
+    <span class="welcome">Welcome, {{ student.name }}</span>
+    <form method="post" action="{% url 'accounts:student_logout' %}">
+      {% csrf_token %}
+      <button class="btn btn-pink btn-sm" type="submit"><svg><use href="#i-logout"/></svg> Log out</button>
+    </form>
+  </div>
+</header>
+
+<div x-data="studentDashboard()">
+  <div class="section-head">
+    <div>
+      <h2 class="display">Your enrolled subjects</h2>
+      <p class="muted">Attendance updates as soon as your teacher saves a session.</p>
+    </div>
+    <button class="btn" type="button" @click="enrollOpen = true; $nextTick(() => $refs.code.focus())"><svg><use href="#i-plus"/></svg> Enroll in a subject</button>
+  </div>
+  <hr class="rule">
+
+  {% if cards %}
+  <div class="grid-2">
+    {% for c in cards %}
+    <article class="card subject-card {% cycle 'card-pink' 'card-blurple' %}">
+      <div>
+        <h3 class="card-title">{{ c.subject.name }}</h3>
+        <div class="subject-meta">
+          <span class="code-chip">{{ c.subject.subject_code }}</span>
+          <span>Section {{ c.subject.section }}</span>
+          <span>Taught by {{ c.subject.teacher.name }}</span>
+        </div>
+      </div>
+      <div class="stat-row">
+        <span class="stat-pill"><strong>{{ c.total }}</strong> class{{ c.total|pluralize:"es" }}</span>
+        <span class="stat-pill {% if c.percent is not None %}{% if c.percent >= 75 %}is-good{% elif c.percent >= 50 %}is-warn{% else %}is-bad{% endif %}{% endif %}"><strong>{{ c.attended }}</strong> attended</span>
+        {% if c.percent is not None %}<span class="stat-pill"><strong>{{ c.percent }}%</strong></span>{% endif %}
+      </div>
+      {% if c.percent is not None %}
+      <div class="progress {% if c.percent < 50 %}is-bad{% elif c.percent < 75 %}is-warn{% endif %}" role="progressbar" aria-valuenow="{{ c.percent }}" aria-valuemin="0" aria-valuemax="100" aria-label="Attendance">
+        <span style="width: {{ c.percent }}%"></span>
+      </div>
+      {% else %}
+      <p class="muted small">No classes recorded yet.</p>
+      {% endif %}
+      <div class="subject-actions">
+        <button class="btn btn-sm btn-dark" type="button" @click="askUnenroll({{ c.subject.pk }}, '{{ c.subject.name|escapejs }}')">
+          <svg><use href="#i-trash"/></svg> Unenroll
+        </button>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">
+    <h3>You're not enrolled in any subject yet</h3>
+    <p class="muted">Ask your teacher for the subject code or scan their QR code.</p>
+    <button class="btn" type="button" @click="enrollOpen = true; $nextTick(() => $refs.code.focus())">Enroll in a subject</button>
+  </div>
+  {% endif %}
+
+  {# ---------------------------------------------------------- Enroll modal #}
+  <div class="modal-backdrop" x-cloak x-show="enrollOpen" @keydown.escape.window="enrollOpen = false" @click.self="enrollOpen = false">
+    <form class="modal" role="dialog" aria-modal="true" aria-labelledby="enroll-title" @submit.prevent="enroll()">
+      <div class="modal-head">
+        <div>
+          <h2 id="enroll-title">Enroll in a subject</h2>
+          <p class="muted small">Enter the code your teacher shared with you.</p>
+        </div>
+        <button class="icon-btn" type="button" aria-label="Close" @click="enrollOpen = false"><svg><use href="#i-close"/></svg></button>
+      </div>
+      <div class="field">
+        <label for="enroll-code">Subject code</label>
+        <input class="input" id="enroll-code" x-ref="code" x-model="code" placeholder="E.g. CS101" autocomplete="off" style="text-transform: uppercase" required>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-light" type="button" @click="enrollOpen = false">Cancel</button>
+        <button class="btn" type="submit" :disabled="!code.trim() || busy">
+          <span class="spinner" x-cloak x-show="busy"></span>
+          <span x-text="busy ? 'Enrolling…' : 'Enroll now'"></span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  {# -------------------------------------------------------- Unenroll modal #}
+  <div class="modal-backdrop" x-cloak x-show="unenroll" @keydown.escape.window="unenroll = null" @click.self="unenroll = null">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="unenroll-title" x-show="unenroll">
+      <div class="modal-head">
+        <h2 id="unenroll-title">Unenroll from <span x-text="unenroll && unenroll.name"></span>?</h2>
+      </div>
+      <p>Your attendance history for this subject stays with your teacher, but the subject will leave your dashboard.</p>
+      <div class="modal-actions">
+        <button class="btn btn-light" type="button" @click="unenroll = null">Keep it</button>
+        <button class="btn btn-dark" type="button" :disabled="busy" @click="confirmUnenroll()">
+          <span class="spinner" x-cloak x-show="busy"></span>
+          <span x-text="busy ? 'Removing…' : 'Yes, unenroll'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener("alpine:init", () => {
+    Alpine.data("studentDashboard", () => ({
+      enrollOpen: false,
+      code: "",
+      busy: false,
+      unenroll: null,
+
+      async enroll() {
+        this.busy = true;
+        try {
+          const data = await Snap.api("{% url 'classroom:api_enroll' %}", { json: { code: this.code.trim() } });
+          Snap.reload(`Enrolled in ${data.subject.name}!`);
+        } catch (err) {
+          Snap.toast(err.message, "error");
+          this.busy = false;
+        }
+      },
+
+      askUnenroll(id, name) {
+        this.unenroll = { id, name };
+      },
+
+      async confirmUnenroll() {
+        this.busy = true;
+        try {
+          await Snap.api("{% url 'classroom:api_unenroll' %}", { json: { subject_id: this.unenroll.id } });
+          Snap.reload(`Unenrolled from ${this.unenroll.name}.`, "info");
+        } catch (err) {
+          Snap.toast(err.message, "error");
+          this.busy = false;
+        }
+      },
+    }));
+  });
+</script>
+{% endblock %}

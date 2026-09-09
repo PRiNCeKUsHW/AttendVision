@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}AttendVision · AI attendance{% endblock %}
+
+{% block content %}
+{% include "partials/icons.html" %}
+<header class="topbar">
+  {% include "partials/brand.html" %}
+  <nav class="cluster" aria-label="Portals">
+    <a class="btn btn-light btn-sm" href="{% url 'accounts:student_login' %}">Student portal</a>
+    <a class="btn btn-pink btn-sm" href="{% url 'accounts:teacher_login' %}">Teacher portal</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <div>
+    <h1 class="hero-title">ATTEND<br>VISION</h1>
+    <p class="hero-lead">
+      Attendance that takes itself. Students sign in with their face, the teacher takes one photo of the room,
+      and AttendVision marks everyone who's there in seconds.
+    </p>
+    <div class="cluster hero-cta">
+      <a class="btn btn-lg" href="{% url 'accounts:student_login' %}">I'm a student <svg><use href="#i-arrow"/></svg></a>
+      <a class="btn btn-lg btn-pink" href="{% url 'accounts:teacher_login' %}">I'm a teacher <svg><use href="#i-arrow"/></svg></a>
+      <a class="btn btn-lg btn-light" href="#how">See how it works</a>
+    </div>
+  </div>
+
+  <div class="hero-visual" aria-hidden="true">
+    <div class="stage" data-tilt>
+      <div class="card stage-back"></div>
+      <div class="card stage-main">
+        <div class="modal-head" style="margin-bottom:.75rem">
+          <div>
+            <strong>Review attendance</strong>
+            <p class="muted small">Introduction to Computer Science · today</p>
+          </div>
+          <span class="badge badge-present">5 / 6 present</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Name</th><th>Seen in</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td>Hamza Rizvi</td><td class="muted">Photo 1</td><td><span class="badge badge-present">Present</span></td></tr>
+              <tr><td>Priya Nair</td><td class="muted">Photo 1, 2</td><td><span class="badge badge-present">Present</span></td></tr>
+              <tr><td>Rohan Das</td><td class="muted">-</td><td><span class="badge badge-absent">Absent</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <span class="stage-chip stage-chip-mint"><svg><use href="#i-check"/></svg> FaceID verified</span>
+      <span class="stage-chip stage-chip-pink"><svg><use href="#i-camera"/></svg> 2 photos scanned</span>
+      <span class="stage-chip stage-chip-cyan"><svg><use href="#i-mic"/></svg> Voice roll call</span>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="how">
+  <div class="section-intro">
+    <h2 class="display">How it works</h2>
+    <p>Three steps, no roll call, no paper register.</p>
+  </div>
+  <div class="steps">
+    <article class="card step">
+      <span class="step-num">1</span>
+      <h3>Students register with their face</h3>
+      <p>A student opens the portal, looks at the webcam and enters their name. That snapshot becomes their FaceID. They can add a short voice sample too.</p>
+    </article>
+    <article class="card step">
+      <span class="step-num">2</span>
+      <h3>Teacher snaps the classroom</h3>
+      <p>Create a subject, share its code or QR so students enroll, then add a few photos of the room from the camera or your gallery.</p>
+    </article>
+    <article class="card step">
+      <span class="step-num">3</span>
+      <h3>Review and save</h3>
+      <p>AttendVision matches every face to an enrolled student. Check the list, fix anything it missed, and save the session with one tap.</p>
+    </article>
+  </div>
+</section>
+
+<section class="section" id="features">
+  <div class="section-intro">
+    <h2 class="display">Everything in one place</h2>
+    <p>Built for real classrooms: quick for teachers, transparent for students.</p>
+  </div>
+  <div class="features">
+    <article class="card feature">
+      <span class="feature-icon"><svg><use href="#i-scan"/></svg></span>
+      <h3>FaceID login</h3>
+      <p>No passwords for students. The camera recognises a registered face and opens their dashboard.</p>
+    </article>
+    <article class="card feature">
+      <span class="feature-icon"><svg><use href="#i-camera"/></svg></span>
+      <h3>Photo attendance</h3>
+      <p>Scan several classroom photos at once. Each student's row shows which photo they were spotted in.</p>
+    </article>
+    <article class="card feature">
+      <span class="feature-icon"><svg><use href="#i-mic"/></svg></span>
+      <h3>Voice roll call</h3>
+      <p>Record students saying "present" and AttendVision matches each voice to its enrolled profile.</p>
+    </article>
+    <article class="card feature">
+      <span class="feature-icon"><svg><use href="#i-share"/></svg></span>
+      <h3>Join by code or QR</h3>
+      <p>Every subject gets a code and a QR link. Students scan it and confirm to enroll in seconds.</p>
+    </article>
+    <article class="card feature">
+      <span class="feature-icon"><svg><use href="#i-check"/></svg></span>
+      <h3>Manual corrections</h3>
+      <p>Toggle any status before saving. The AI suggests, the teacher decides.</p>
+    </article>
+    <article class="card feature">
+      <span class="feature-icon"><svg><use href="#i-list"/></svg></span>
+      <h3>Records and stats</h3>
+      <p>Teachers browse every session with per-student detail. Students see how many classes they've attended.</p>
+    </article>
+  </div>
+</section>
+
+<section class="section" id="portals">
+  <div class="section-intro">
+    <h2 class="display">Pick your portal</h2>
+    <p>Students sign in with their face. Teachers use a username and password.</p>
+  </div>
+  <div class="portals">
+    <a class="card portal portal-student" href="{% url 'accounts:student_login' %}">
+      <img src="https://i.ibb.co/844D9Lrt/mascot-student.png" alt="">
+      <h2>I'm a student</h2>
+      <p>Sign in with FaceID, join subjects with a code and track how many classes you've attended.</p>
+      <span class="btn">Student portal <svg><use href="#i-arrow"/></svg></span>
+    </a>
+    <a class="card portal" href="{% url 'accounts:teacher_login' %}">
+      <img src="https://i.ibb.co/CsmQQV6X/mascot-prof.png" alt="">
+      <h2>I'm a teacher</h2>
+      <p>Create subjects, share a join code, then take attendance from photos or a voice roll call.</p>
+      <span class="btn btn-pink">Teacher portal <svg><use href="#i-arrow"/></svg></span>
+    </a>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Hero stage follows the pointer for a light 3D tilt; skipped for reduced motion.
+  (function () {
+    const stage = document.querySelector("[data-tilt]");
+    if (!stage || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const base = "rotateX(8deg) rotateY(-14deg)";
+    const area = stage.closest(".hero");
+    area.addEventListener("mousemove", (e) => {
+      const r = area.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5;
+      const y = (e.clientY - r.top) / r.height - 0.5;
+      stage.style.transform = `rotateX(${8 - y * 10}deg) rotateY(${-14 + x * 14}deg)`;
+    });
+    area.addEventListener("mouseleave", () => {
+      stage.style.transform = base;
+    });
+  })();
+</script>
+{% endblock %}

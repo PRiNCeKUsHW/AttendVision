@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Student FaceID login · AttendVision{% endblock %}
+
+{% block content %}
+{% include "partials/icons.html" %}
+<header class="topbar">
+  {% include "partials/brand.html" %}
+  <a class="btn btn-pink" href="{% url 'accounts:home' %}">Back to home</a>
+</header>
+
+<div class="auth" style="width: min(640px, 100%)" x-data="faceLogin('{{ next|escapejs }}')">
+  <div>
+    <h1 class="display">Log in with FaceID</h1>
+    <p class="muted">Look at the camera and we'll find your profile. New students register in one step.</p>
+  </div>
+
+  <div class="card" x-data="camera()" x-init="start()" x-ref="cam">
+    <div class="stack">
+      <div class="cam">
+        <video x-ref="video" playsinline muted autoplay></video>
+        <div class="cam-guide" :class="{ 'is-scanning': state === 'scanning', 'is-good': state === 'recognised', 'is-bad': state === 'unknown' || state === 'problem' }"></div>
+        <div class="cam-overlay" x-cloak x-show="error">
+          <p x-text="error"></p>
+          <button class="btn btn-light" type="button" @click="start()">Try again</button>
+        </div>
+      </div>
+
+      <div class="status-line" aria-live="polite">
+        <span class="status-dot" :class="{ 'is-scanning': state === 'scanning', 'is-good': state === 'recognised', 'is-bad': state === 'unknown' || state === 'problem' }"></span>
+        <span x-text="message || 'Position your face inside the outline.'"></span>
+      </div>
+
+      <div class="cluster">
+        <button class="btn btn-lg" type="button" :disabled="!ready || state === 'scanning'" @click="scan(await capture())">
+          <span class="spinner" x-cloak x-show="state === 'scanning'"></span>
+          <svg x-show="state !== 'scanning'"><use href="#i-scan"/></svg>
+          <span x-text="state === 'scanning' ? 'Scanning…' : 'Scan my face'"></span>
+        </button>
+        <button class="icon-btn" type="button" title="Switch camera" @click="flip()"><svg><use href="#i-flip"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <form class="card card-pink fade-enter" x-cloak x-show="state === 'unknown'" @submit.prevent="register()">
+    <div>
+      <h2 class="display">Register a new profile</h2>
+      <p class="muted">We'll use the snapshot we just took as your FaceID.</p>
+    </div>
+    <div class="field">
+      <label for="name">Your name</label>
+      <input class="input" id="name" x-model="name" placeholder="E.g. Hamza Rizvi" autocomplete="name" required>
+    </div>
+
+    <div class="stack" x-data="recorder({ maxSeconds: 20 })" x-effect="voiceBlob = blob">
+      <div>
+        <h3>Voice profile <span class="muted small">(optional)</span></h3>
+        <p class="muted small">Lets your teacher mark you present with a voice roll call. Say something like “I am present, my name is Akash.”</p>
+      </div>
+      <div class="recorder">
+        <div class="recorder-row">
+          <button class="btn btn-dark" type="button" x-show="!recording" @click="start()">
+            <svg><use href="#i-mic"/></svg> <span x-text="blob ? 'Record again' : 'Record voice'"></span>
+          </button>
+          <button class="btn btn-pink" type="button" x-cloak x-show="recording" @click="stop()">
+            <span class="rec-dot"></span> Stop · <span x-text="label"></span>
+          </button>
+          <span class="muted small" x-cloak x-show="processing"><span class="spinner"></span> Processing…</span>
+          <span class="badge badge-present" x-cloak x-show="blob && !processing"><svg width="14" height="14"><use href="#i-check"/></svg> Voice sample ready</span>
+        </div>
+        <audio controls x-cloak x-show="url" :src="url"></audio>
+        <p class="small" x-cloak x-show="error" x-text="error" style="color: var(--coral)"></p>
+      </div>
+    </div>
+
+    <button class="btn btn-lg btn-block" type="submit" :disabled="!name.trim() || busy">
+      <span class="spinner" x-cloak x-show="busy"></span>
+      <span x-text="busy ? 'Creating profile…' : 'Create my profile'"></span>
+    </button>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener("alpine:init", () => {
+    Alpine.data("faceLogin", (next) => ({
+      state: "idle", // idle | scanning | recognised | unknown | problem
+      message: "",
+      snapshot: null,
+      name: "",
+      voiceBlob: null,
+      busy: false,
+
+      async scan(blob) {
+        if (!blob) {
+          this.state = "problem";
+          this.message = "Camera isn't ready yet. Give it a second and try again.";
+          return;
+        }
+        this.snapshot = blob;
+        this.state = "scanning";
+        this.message = "Looking for your face…";
+        const form = new FormData();
+        form.append("image", blob, "snapshot.jpg");
+        try {
+          const data = await Snap.api("{% url 'accounts:student_face_login' %}" + (next ? "?next=" + encodeURIComponent(next) : ""), { form });
+          if (data.status === "recognised") {
+            this.state = "recognised";
+            this.message = `Welcome back, ${data.student.name}!`;
+            Snap.flash(`Welcome back, ${data.student.name}!`);
+            window.location.assign(data.redirect);
+            return;
+          }
+          this.message = data.message;
+          this.state = data.status === "unknown" ? "unknown" : "problem";
+        } catch (err) {
+          this.state = "problem";
+          this.message = err.message;
+        }
+      },
+
+      async register() {
+        if (!this.snapshot || !this.name.trim()) return;
+        this.busy = true;
+        const form = new FormData();
+        form.append("name", this.name.trim());
+        form.append("image", this.snapshot, "snapshot.jpg");
+        if (this.voiceBlob) form.append("audio", this.voiceBlob, "voice.wav");
+        try {
+          const data = await Snap.api("{% url 'accounts:student_register' %}" + (next ? "?next=" + encodeURIComponent(next) : ""), { form });
+          Snap.flash(
+            data.voice_warning
+              ? `Profile created, hi ${data.student.name}! We couldn't use the voice sample though.`
+              : `Profile created! Hi ${data.student.name}!`,
+            data.voice_warning ? "info" : "success"
+          );
+          window.location.assign(data.redirect);
+        } catch (err) {
+          Snap.toast(err.message, "error");
+          this.busy = false;
+        }
+      },
+    }));
+  });
+</script>
+{% endblock %}
