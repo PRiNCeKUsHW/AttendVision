@@ -18,6 +18,10 @@ if RENDER_EXTERNAL_HOSTNAME:
     CSRF_TRUSTED_ORIGINS.append(f"https://{RENDER_EXTERNAL_HOSTNAME}")
 
 if not DEBUG:
+    if SECRET_KEY.startswith("dev-only-"):
+        from django.core.exceptions import ImproperlyConfigured
+
+        raise ImproperlyConfigured("Set the SECRET_KEY environment variable when DEBUG=0.")
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
