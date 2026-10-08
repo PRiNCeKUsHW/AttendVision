@@ -1,6 +1,11 @@
+# CPU-only PyTorch (resemblyzer dependency) keeps the build small on Linux hosts
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 # Web framework
 django>=5.1,<6
 dj-database-url
+gunicorn
+whitenoise
 
 # Utilities
 numpy
@@ -18,5 +23,5 @@ resemblyzer
 librosa
 soundfile
 
-# Optional: PostgreSQL / Supabase via DATABASE_URL
-# psycopg[binary]
+# PostgreSQL via DATABASE_URL
+psycopg[binary]
