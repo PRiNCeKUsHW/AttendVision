@@ -204,7 +204,8 @@
   {# ---------------------------------------------------------- Photos modal #}
   <div class="modal-backdrop" x-cloak x-show="photosOpen" @keydown.escape.window="photosOpen = false" @click.self="photosOpen = false">
     <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="photos-title"
-         x-data="camera({ facing: 'environment' })" x-effect="photosOpen && photoTab === 'camera' ? start() : stop()">
+         x-data="camera({ facing: 'environment' })"
+         x-init="$watch(() => photosOpen && photoTab === 'camera', (on) => on ? start() : stop())">
       <div class="modal-head">
         <div>
           <h2 id="photos-title">Add classroom photos</h2>

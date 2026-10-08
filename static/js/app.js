@@ -162,10 +162,13 @@
           await video.play();
           this.ready = true;
         } catch (err) {
+          const name = err && err.name;
           this.error =
-            err && err.name === "NotAllowedError"
+            name === "NotAllowedError"
               ? "Camera access was blocked. Allow the camera in your browser and try again."
-              : "No camera found. Connect one and reload the page.";
+              : name === "NotReadableError"
+                ? "The camera is busy in another app. Close it and try again."
+                : "No camera found. Connect one and reload the page.";
         }
       },
 
